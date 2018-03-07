@@ -17,20 +17,32 @@ type Game struct {
 }
 
 func getFreeGames(w http.ResponseWriter, r *http.Request) {
-    doc, err := goquery.NewDocument("https://www.playstation.com/en-us/explore/playstation-plus")
+    var base_url string = "https://store.playstation.com"
+
+    doc, err := goquery.NewDocument(base_url + "/en-us/home/games/psplus")
     if err != nil {
         log.Fatal(err)
     }
+    // Get the text 'Free Games' link
+    link, err3 := doc.Find("a:contains('Free Games')").First().Attr("href")
+    if !err3{
+        log.Fatal(err3)
+    }
+    // Now visit that link
+    doc2, err2 := goquery.NewDocument(base_url + link)
+    if err2 != nil {
+        log.Fatal(err2)
+    }
+
     var free_games []Game
-    // Get the element by the contains seach flag, and look for the text
-    // Then get the parent of that element's parent
-    // Finally, iterate through the li elements in the ul INSIDE the div element
-    doc.Find("h3:contains('Membership Includes These Free Games')").First().Parent().Parent().Find("div ul li").Each(func(index int, item *goquery.Selection) {
-        // Note that we replace a special character being used in the sony website (U+00A0 : NO-BREAK SPACE [NBSP])
-        game_parts := strings.Split(strings.Replace(item.Text(), " ", "", -1), "//")
-        title, console := game_parts[0], game_parts[1]
-        // Add it to the array while removing trailing whitespace
-        free_games = append(free_games, Game{strings.Trim(title, " "), strings.Trim(console, " ")})
+    // Get the base container and the divs inside
+    doc2.Find(".grid-cell-container div.ember-view .grid-cell-row__container").Each(func(index int, item *goquery.Selection) {
+        // For each div inside
+        item.Find(".grid-cell__body").Each(func(index2 int, item2 *goquery.Selection) {
+            title   := item2.Find(".grid-cell__title").Text()
+            console := item2.Find(".grid-cell__left-detail.grid-cell__left-detail--detail-1").Text()
+            free_games = append(free_games, Game{strings.Trim(title, " "), strings.Trim(console, " ")})
+        })
     })
     // Time to send it, first marshal the array
     jData, err := json.Marshal(free_games)
